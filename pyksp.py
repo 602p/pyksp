@@ -1,10 +1,11 @@
 import threading, urllib2, json, time
 
 def _get_apistrings_read(base, vessel):
+	"""This function is called by the background thread, and fetches all subscriptions"""
 	strings=vessel.subscriptions
 	callstring="api_version=a.version"
 	for i in strings:
-		callstring+="&"+i+"="+vessel.apistrings_read[i]
+		callstring+="&"+i+"="+vessel.apistrings_read[i] #Build callstring
 	result = json.loads(urllib2.urlopen(base+callstring).read())
 	for item in strings:
 		try:
@@ -13,17 +14,20 @@ def _get_apistrings_read(base, vessel):
 			pass
 
 def _fetch_parallel(base, active_vessel):
-	    while active_vessel.loop_running:
-	    	t=threading.Thread(target=_get_apistrings_read, args=(base, active_vessel))
-	        t.start()
-	        time.sleep(active_vessel.update_speed)
+	"""this thread is run in the backgroun, and contiunously starts new connection threads"""
+	while active_vessel.loop_running: #Exit on command of the ActiveVessel tis is attached to
+		t=threading.Thread(target=_get_apistrings_read, args=(base, active_vessel))
+		t.start() #Start a thread to read from telemachus
+		time.sleep(active_vessel.update_speed)
 
 def _run(command):
+	"""Called in background when a command is run"""
 	urllib2.urlopen(command)
 
 class ActiveVessel:
+	"""OO Interface for the Telemachus API"""
 
-	apistrings_read={
+	apistrings_read={ #Index of Nice Name:Telemachus API String
 	"pause_state":"p.paused",
 
 	"throttle_status":"f.throttle",
@@ -130,7 +134,7 @@ class ActiveVessel:
 	"resource_xg_current":"r.resource[XenonGas]",
 	}
 
-	apistrings_write={
+	apistrings_write={ #Map of human name:Telemachus API string for functions
 	"action_group_1":"f.ag1",
 	"action_group_2":"f.ag2",
 	"action_group_3":"f.ag3",
@@ -161,11 +165,11 @@ class ActiveVessel:
 	}
 
 	def __init__(self, url="localhost:8085", base_path="/telemachus/datalink?", update_speed=0.1):
-		self.base="http://"+url+base_path
+		self.base="http://"+url+base_path #Constuct base call path
 		self.subscriptions=[]
 		self.current_values={}
 		self.update_speed=update_speed
-		self.loop_running=False
+		self.loop_running=False #Keep track of whether background thread should exit
 		for i in self.apistrings_read.keys():
 			self.current_values[i]=None
 
@@ -175,37 +179,43 @@ class ActiveVessel:
 		return True
 
 	def raw_run_command(self, string):
-		"""Run a command"""
+		"""Run a command, using a raw querystring"""
 		t=threading.Thread(target=_run, args=(self.base+string,))
 		t.start()
 		return True
 
 	def run_command(self, string):
-		"""Run a command"""
+		"""Run a command, constructing a querystring from the API keys"""
 		self.raw_run_command("x="+self.apistrings_write[string])
 		return True
 
 	def set_throttle(self, value):
+		"""Set throttle, 1-100"""
 		self.raw_run_command("x=v.setThrottle["+str(value)+"]")
 		return True
 
 	def set_timewarp(self, value):
+		"""Set timeWarp, unknown units. 1-6?"""
 		self.raw_run_command("x=v.timeWarp["+str(value)+"]")
 		return True
 
 	def set_yaw(self, value):
+		"""Set Yaw. 0-1"""
 		self.raw_run_command("x=v.setYaw["+str(value)+"]")
 		return True
 
 	def set_pitch(self, value):
+		"""Set Pitch. 0-1"""
 		self.raw_run_command("x=v.setPitch["+str(value)+"]")
 		return True
 
 	def set_roll(self, value):
+		"""Set Roll. 0-1"""
 		self.raw_run_command("x=v.setRoll["+str(value)+"]")
 		return True
 
 	def subscribe_string(self, string):
+		"""Start tracking a value. Returns True if tracking succeded."""
 		if not string in self.subscriptions:
 			if string in self.apistrings_read.keys():
 				self.subscriptions.append(string)
@@ -213,71 +223,81 @@ class ActiveVessel:
 		return False
 
 	def unsubscribe_string(self, string):
+		"""Stop Tracking a value"""
 		try:
 			del self.subscriptions[self.subscriptions.index(string)]
 		except ValueError:
 			return
 
-	def subscribe(self, s): self.subscribe_string(s)
-	def unsubscribe(self, s): self.unsubscribe_string(s)
+	def subscribe(self, s):
+		"""Start tracking a value. Returns True if tracking succeded."""
+		return self.subscribe_string(s)
+	def unsubscribe(self, s):
+		"""Stop Tracking a value"""
+		self.unsubscribe_string(s)
 
 	def start(self):
+		"""Start running the tracing loop. Nothing bad happens if called multiple times on the same ActiveVessel instance."""
 		if not self.loop_running:
 			self.loop_running=True
 			t=threading.Thread(target=_fetch_parallel, args=(self.base, self))
 			t.start()
 
 	def stop(self):
+		"""Stop tracking"""
 		self.loop_running=False
 
 	def get(self, value):
+		"""Shorthand to get a value"""
 		return self.current_values[value]
 
 	def run(self, string):
+		"""Run a command, mapped from the apistrings_write dictionary"""
 		self.run_command(string)
 
 class WrappedVessel(ActiveVessel):
-	def __getattr__(self, *args):
+	def __getattr__(self, *args): #Overload __getattr__ to support doing vessel.vessel_altitude and the like
 		if not args[0] in self.subscriptions:
 			self.subscribe_string(args[0])
 		return self.current_values[args[0]]
-	def toggle_ag1(self):
+	def toggle_ag1(self): #Self-Evident
 		self.run_command("action_group_1")
-	def toggle_ag2(self):
+	def toggle_ag2(self): #Self-Evident
 		self.run_command("action_group_2")
-	def toggle_ag3(self):
+	def toggle_ag3(self): #Self-Evident
 		self.run_command("action_group_3")
-	def toggle_ag4(self):
+	def toggle_ag4(self): #Self-Evident
 		self.run_command("action_group_4")
-	def toggle_ag5(self):
+	def toggle_ag5(self): #Self-Evident
 		self.run_command("action_group_5")
-	def toggle_ag6(self):
+	def toggle_ag6(self): #Self-Evident
 		self.run_command("action_group_6")
-	def toggle_ag7(self):
+	def toggle_ag7(self): #Self-Evident
 		self.run_command("action_group_7")
-	def toggle_ag8(self):
+	def toggle_ag8(self): #Self-Evident
 		self.run_command("action_group_8")
-	def toggle_ag9(self):
+	def toggle_ag9(self): #Self-Evident
 		self.run_command("action_group_9")
-	def toggle_ag10(self):
+	def toggle_ag10(self): #Self-Evident
 		self.run_command("action_group_10")
-	def toggle_gear(self):
+	def toggle_gear(self): #Self-Evident
 		self.run_command("gear")
-	def toggle_light(self):
+	def toggle_light(self): #Self-Evident
 		self.run_command("light")
-	def toggle_brake(self):
+	def toggle_brake(self): #Self-Evident
 		self.run_command("brake")
 	def toggle_fbw(self):
+		"""Enable/Disable fly-by-wire mode. This needs to be on to set YPR"""
 		self.run_command("toggle_fbw")
-	def throttle_zero(self):
+	def throttle_zero(self): #Self-Evident
 		self.run_command("throttle_zero")
-	def throttle_full(self):
+	def throttle_full(self): #Self-Evident
 		self.run_command("throttle_full")
-	def throttle_up(self):
+	def throttle_up(self): #Self-Evident
 		self.run_command("throttle_up")
-	def throttle_down(self):
+	def throttle_down(self): #Self-Evident
 		self.run_command("throttle_down")
-	def stage(self):
+	def stage(self): #Self-Evident
 		self.run_command("stage")
-	def abort(self):
+	def abort(self): #Self-Evident
 		self.run_command("abort")

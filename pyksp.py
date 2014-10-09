@@ -256,6 +256,7 @@ class ActiveVessel:
 		self.run_command(string)
 
 class WrappedVessel(ActiveVessel):
+	"""EXPERIMENTAL"""
 	def __getattr__(self, *args): #Overload __getattr__ to support doing vessel.vessel_altitude and the like
 		if not args[0] in self.subscriptions:
 			self.subscribe_string(args[0])

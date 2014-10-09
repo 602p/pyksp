@@ -302,3 +302,7 @@ class WrappedVessel(ActiveVessel):
 		self.run_command("stage")
 	def abort(self): #Self-Evident
 		self.run_command("abort")
+	def sas(self): #Self-Evident
+		self.run_command("sas")
+	def rcs(self): #Self-Evident
+			self.run_command("rcs")

@@ -188,6 +188,11 @@ class ActiveVessel:
 		"""Run a command, constructing a querystring from the API keys"""
 		self.raw_run_command("x="+self.apistrings_write[string])
 		return True
+        
+	def run_command(self, string, value):
+		"""Run a command, constructing a querystring from the API keys and set a specific value"""
+		self.raw_run_command("x="+self.apistrings_write[string]+"["+value+"]")
+		return True
 
 	def set_throttle(self, value):
 		"""Set throttle, 1-100"""
@@ -212,6 +217,11 @@ class ActiveVessel:
 	def set_roll(self, value):
 		"""Set Roll. 0-1"""
 		self.raw_run_command("x=v.setRoll["+str(value)+"]")
+		return True
+
+	def set_6dof(self, pitch, yaw, roll, x, y, z):
+		"""Set Pitch, Yaw, Roll, X, Y and Z all at once. 0-1"""
+		self.raw_run_command("x=v.setPitchYawRollXYZ["+str(pitch)+","+str(yaw)+","+str(roll)+","+str(x)+","+str(y)+","+str(z)+"]")
 		return True
 
 	def subscribe_string(self, string):

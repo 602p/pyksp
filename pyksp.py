@@ -158,6 +158,13 @@ class ActiveVessel:
 	"throttle_full":"f.throttleFull",
 	"throttle_up":"f.throttleUp",
 	"throttle_down":"f.throttleDown",
+	"set_throttle":"f.setThrottle",
+
+	"set_timewarp":"t.timeWarp",
+	"set_pitch":"v.setPitch",
+	"set_yaw":"v.setYaw",
+	"set_roll":"v.setRoll",
+	"set_6dof":"v.setPitchYawRollXYZ",
 
 	"gear":"f.gear",
 	"brake":"f.brake",
@@ -172,9 +179,10 @@ class ActiveVessel:
 
 	"enable_fbw":"b.setFbW[1]",
 	"disable_fbw":"b.setFbW[0]",
+	"set_fbw":"b.setFbW"
 	}
 
-	def __init__(self, url="localhost:8085", base_path="/telemachus/datalink?", update_speed=0.1):
+	def __init__(self, url="localhost:8085", base_path="/telemachus/datalink?", update_speed=0.1, dont_start=False):
 		self.base="http://"+url+base_path #Constuct base call path
 		self.subscriptions=[]
 		self.current_values={}
@@ -182,56 +190,69 @@ class ActiveVessel:
 		self.loop_running=False #Keep track of whether background thread should exit
 		for i in self.apistrings_read.keys():
 			self.current_values[i]=None
+		if not dont_start:
+			self.start()
 
 	def test_connection(self):
 		"""Test a connection to the telemachus server, and throw an HTTPError if it fails"""
 		urllib2.urlopen(self.base+'a=v.altitude').read()
 		return True
 
-	def raw_run_command(self, stringx):
-		"""Run a command, using a raw querystring"""
-		t=threading.Thread(target=_run, args=(self.base+stringx,))
+	def _create_qs_params(self, value):
+		"""Create a bracket wrapped value set for telemachus API calls. If value is specified as a list, it will be added to the querystring. If not a list, it will be converted to string and added as a single paramerter."""
+		value_string=""
+		if value!=None:
+			if type(value)!=list:
+				value_string="["+str(value)+"]"
+			else:
+				value_string="["
+				for i in value:
+					value_string+=str(i) #Implicitly convert to string, as python dosent do it automatically on concatination
+					if value.index(i)!=len(value)-1:
+						value_string+=","
+				value_string+="]"
+		return value_string
+
+	def raw_run_command(self, stringx, value=None):
+		"""Run a command, using a raw querystring. If specified, value will be appended to string"""
+		print self.base+stringx+self._create_qs_params(value)
+		t=threading.Thread(target=_run, args=(self.base+stringx+self._create_qs_params(value),))
 		t.start()
 		return True
 
-	def run_command(self, stringx):
-		"""Run a command, constructing a querystring from the API keys"""
-		self.raw_run_command("x="+self.apistrings_write[stringx])
-		return True
-        
-	def run_command(self, string, value):
-		"""Run a command, constructing a querystring from the API keys and set a specific value"""
-		self.raw_run_command("x="+self.apistrings_write[string]+"["+value+"]")
+	def run_command(self, stringx, value=None):
+		"""Run a command, constructing a querystring from the API keys. If specified, value will be appended to string.""" 
+		self.raw_run_command("x="+self.apistrings_write[stringx], value)
 		return True
 
 	def set_throttle(self, value):
 		"""Set throttle, 0-1"""
-		self.raw_run_command("a=f.setThrottle["+str(value)+"]")
+		self.run_command("set_throttle",float(value))
 		return True
 
 	def set_timewarp(self, value):
 		"""Set timeWarp, unknown units. 1-6?"""
-		self.raw_run_command("x=t.timeWarp["+str(value)+"]")
+		self.run_command("set_timewarp", value)
 		return True
 
 	def set_yaw(self, value):
 		"""Set Yaw. 0-1"""
-		self.raw_run_command("x=v.setYaw["+str(value)+"]")
+		self.run_command("set_yaw", value)
 		return True
 
 	def set_pitch(self, value):
 		"""Set Pitch. 0-1"""
-		self.raw_run_command("x=v.setPitch["+str(value)+"]")
+		self.run_command("set_pitch", value)
 		return True
 
 	def set_roll(self, value):
 		"""Set Roll. 0-1"""
-		self.raw_run_command("x=v.setRoll["+str(value)+"]")
+		self.run_command("set_roll", value)
 		return True
 
 	def set_6dof(self, pitch, yaw, roll, x, y, z):
 		"""Set Pitch, Yaw, Roll, X, Y and Z all at once. 0-1"""
-		self.raw_run_command("x=v.setPitchYawRollXYZ["+str(pitch)+","+str(yaw)+","+str(roll)+","+str(x)+","+str(y)+","+str(z)+"]")
+		self.raw_run_command("set_6dof", [pitch,yaw,roll,x,y,z])
 		return True
 
 	def subscribe_string(self, string):
@@ -280,32 +301,67 @@ class WrappedVessel(ActiveVessel):
 	def __getattr__(self, *args): #Overload __getattr__ to support doing vessel.vessel_altitude and the like
 		if not args[0] in self.subscriptions:
 			self.subscribe_string(args[0])
+		if not args[0] in self.current_values:
+			return "ERROR: NOT IMPLEMENTED"
 		return self.current_values[args[0]]
-	def toggle_ag1(self): #Self-Evident
-		self.run_command("action_group_1")
-	def toggle_ag2(self): #Self-Evident
-		self.run_command("action_group_2")
-	def toggle_ag3(self): #Self-Evident
-		self.run_command("action_group_3")
-	def toggle_ag4(self): #Self-Evident
-		self.run_command("action_group_4")
-	def toggle_ag5(self): #Self-Evident
-		self.run_command("action_group_5")
-	def toggle_ag6(self): #Self-Evident
-		self.run_command("action_group_6")
-	def toggle_ag7(self): #Self-Evident
-		self.run_command("action_group_7")
-	def toggle_ag8(self): #Self-Evident
-		self.run_command("action_group_8")
-	def toggle_ag9(self): #Self-Evident
-		self.run_command("action_group_9")
-	def toggle_ag10(self): #Self-Evident
-		self.run_command("action_group_10")
-	def toggle_gear(self): #Self-Evident
+	def toggle_ag1(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_1", boolx)
+	def toggle_ag2(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_2", boolx)
+	def toggle_ag3(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_3", boolx)
+	def toggle_ag4(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_4", boolx)
+	def toggle_ag5(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_5", boolx)
+	def toggle_ag6(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_6", boolx)
+	def toggle_ag7(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_7", boolx)
+	def toggle_ag8(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_8", boolx)
+	def toggle_ag9(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_9", boolx)
+	def toggle_ag10(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("action_group_10", boolx)
+	def toggle_gear(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
 		self.run_command("gear")
-	def toggle_light(self): #Self-Evident
+	def toggle_light(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
 		self.run_command("light")
-	def toggle_brake(self): #Self-Evident
+	def toggle_brake(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
 		self.run_command("brake")
 	def enable_fbw(self):
 		"""Enable fly-by-wire mode. This needs to be on to set YPR"""
@@ -313,6 +369,9 @@ class WrappedVessel(ActiveVessel):
 	def disable_fbw(self):
 		"""Disable fly-by-wire mode. This needs to be on to set YPR"""
 		self.run_command("disable_fbw")
+	def set_fbw(self, boolx):
+		"""Set FBW. True/False"""
+		self.run_command("set_fbw", int(boolx))
 	def throttle_zero(self): #Self-Evident
 		self.run_command("throttle_zero")
 	def throttle_full(self): #Self-Evident
@@ -325,7 +384,13 @@ class WrappedVessel(ActiveVessel):
 		self.run_command("stage")
 	def abort(self): #Self-Evident
 		self.run_command("abort")
-	def sas(self): #Self-Evident
-		self.run_command("sas")
-	def rcs(self): #Self-Evident
-		self.run_command("rcs")
+	def sas(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("sas", boolx)
+	def rcs(self, boolx=None): #Self-Evident
+		"""Set Action Group. Optional boolx: set to this value"""
+		if boolx!=None:
+			boolx=str(boolx)
+		self.run_command("rcs", boolx)

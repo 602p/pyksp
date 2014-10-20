@@ -182,14 +182,17 @@ class ActiveVessel:
 	"set_fbw":"b.setFbW"
 	}
 
-	def __init__(self, url="localhost:8085", base_path="/telemachus/datalink?", update_speed=0.1, dont_start=False):
+	def __init__(self, url="localhost:8085", base_path="/telemachus/datalink?", update_speed=0.1, dont_start=False, dont_check=False):
+		"""Use to connect to a telemachus instance. URL is the URI on your network (or internet!) base_path is the URL's HTTP API endpoint. update_speed is the speed (in seconds) to pull new data. If dont_start is ticked, the background loop won't start, otherwise it will start updating immediatly; Useful if instanciating before you want to start using it. If dont_check is ticked, no connection test will be dont, otherwise a check will be made during init; Useful if instanciating before you want to start using it."""
 		self.base="http://"+url+base_path #Constuct base call path
 		self.subscriptions=[]
 		self.current_values={}
 		self.update_speed=update_speed
 		self.loop_running=False #Keep track of whether background thread should exit
-		for i in self.apistrings_read.keys():
+		for i in self.apistrings_read.keys(): #Populate with Nones
 			self.current_values[i]=None
+		if not dont_check:
+			self.test_connection()
 		if not dont_start:
 			self.start()
 

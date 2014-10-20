@@ -12,6 +12,10 @@ def _get_apistrings_read(base, vessel):
 			vessel.current_values[item]=result[item]
 		except KeyError:
 			pass
+	try:
+		vessel.current_values["api_version"]=result["api_version"]
+	except KeyError:
+		pass
 
 def _fetch_parallel(base, active_vessel):
 	"""this thread is run in the backgroun, and contiunously starts new connection threads"""
@@ -108,7 +112,7 @@ class ActiveVessel:
 	"vessel_roll":"n.roll",
 	"vessel_heading_raw":"n.rawheading",
 	"vessel_pitch_raw":"n.rawpitch",
-	"vessel_roll_raw":"m.rawroll",
+	"vessel_roll_raw":"n.rawroll",
 
 	"docking_delta_x_angle":"dock.ax",
 	"docking_delta_y_angle":"dock.ay",
@@ -132,6 +136,7 @@ class ActiveVessel:
 	"resource_sf_current":"r.resource[SolidFuel]",
 	"resource_mp_current":"r.resource[MonoPropellant]",
 	"resource_xg_current":"r.resource[XenonGas]",
+	"api_version":"a.version"
 	}
 
 	apistrings_write={ #Map of human name:Telemachus API string for functions
@@ -159,9 +164,14 @@ class ActiveVessel:
 	"light":"f.light",
 
 	"sas":"f.sas",
+	"sas_on":"f.sas[1]",
+	"sas_off":"f.sas[0]",
 	"rcs":"f.rcs",
+	"rcs_on":"f.rcs[1]",
+	"rcs_off":"f.rcs[0]",
 
-	"toggle_fbw":"b.setFbW"
+	"enable_fbw":"b.setFbW[1]",
+	"disable_fbw":"b.setFbW[0]",
 	}
 
 	def __init__(self, url="localhost:8085", base_path="/telemachus/datalink?", update_speed=0.1):
@@ -178,15 +188,15 @@ class ActiveVessel:
 		urllib2.urlopen(self.base+'a=v.altitude').read()
 		return True
 
-	def raw_run_command(self, string):
+	def raw_run_command(self, stringx):
 		"""Run a command, using a raw querystring"""
-		t=threading.Thread(target=_run, args=(self.base+string,))
+		t=threading.Thread(target=_run, args=(self.base+stringx,))
 		t.start()
 		return True
 
-	def run_command(self, string):
+	def run_command(self, stringx):
 		"""Run a command, constructing a querystring from the API keys"""
-		self.raw_run_command("x="+self.apistrings_write[string])
+		self.raw_run_command("x="+self.apistrings_write[stringx])
 		return True
         
 	def run_command(self, string, value):
@@ -195,13 +205,13 @@ class ActiveVessel:
 		return True
 
 	def set_throttle(self, value):
-		"""Set throttle, 1-100"""
-		self.raw_run_command("x=v.setThrottle["+str(value)+"]")
+		"""Set throttle, 0-1"""
+		self.raw_run_command("a=f.setThrottle["+str(value)+"]")
 		return True
 
 	def set_timewarp(self, value):
 		"""Set timeWarp, unknown units. 1-6?"""
-		self.raw_run_command("x=v.timeWarp["+str(value)+"]")
+		self.raw_run_command("x=t.timeWarp["+str(value)+"]")
 		return True
 
 	def set_yaw(self, value):
@@ -297,9 +307,12 @@ class WrappedVessel(ActiveVessel):
 		self.run_command("light")
 	def toggle_brake(self): #Self-Evident
 		self.run_command("brake")
-	def toggle_fbw(self):
-		"""Enable/Disable fly-by-wire mode. This needs to be on to set YPR"""
-		self.run_command("toggle_fbw")
+	def enable_fbw(self):
+		"""Enable fly-by-wire mode. This needs to be on to set YPR"""
+		self.run_command("enable_fbw")
+	def disable_fbw(self):
+		"""Disable fly-by-wire mode. This needs to be on to set YPR"""
+		self.run_command("disable_fbw")
 	def throttle_zero(self): #Self-Evident
 		self.run_command("throttle_zero")
 	def throttle_full(self): #Self-Evident
@@ -315,4 +328,4 @@ class WrappedVessel(ActiveVessel):
 	def sas(self): #Self-Evident
 		self.run_command("sas")
 	def rcs(self): #Self-Evident
-			self.run_command("rcs")
+		self.run_command("rcs")

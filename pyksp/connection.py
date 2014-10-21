@@ -1,31 +1,36 @@
 import threading, urllib2, json, time
 
-def _get_apistrings_read(base, vessel):
+def _get_apistrings_read(base_url, data_dict, subscriptions):
 	"""This function is called by the background thread, and fetches all subscriptions"""
-	strings=vessel.subscriptions
-	callstring="api_version=a.version"
+	strings=subscriptions
+	callstring="universal_time=t.universal_time"
 	for i in strings:
-		callstring+="&"+i+"="+vessel.apistrings_read[i] #Build callstring
-	result = json.loads(urllib2.urlopen(base+callstring).read())
+		callstring+="&"+i+"="+apistrings_read[i] #Build callstring
+	result = json.loads(urllib2.urlopen(base_url+callstring).read())
 	for item in strings:
 		try:
-			vessel.current_values[item]=result[item]
+			data_dict[item]=result[item]
 		except KeyError:
 			pass
 	try:
-		vessel.current_values["api_version"]=result["api_version"]
+		data_dict["universal_time"]=result["universal_time"]
 	except KeyError:
 		pass
 
-def _fetch_parallel(base, active_vessel):
-	"""this thread is run in the backgroun, and contiunously starts new connection threads"""
-	while active_vessel.loop_running: #Exit on command of the ActiveVessel tis is attached to
-		t=threading.Thread(target=_get_apistrings_read, args=(base, active_vessel))
+def _fetch_parallel(loop_var, update_speed, base_url, data_dict, subscriptions):
+	"""This thread is run in the background, and contiunously starts new connection threads"""
+	while loop_var: #Exit on command of the ActiveVessel tis is attached to
+		t=threading.Thread(target=_get_apistrings_read, args=(base_url, data_dict, subscriptions))
 		t.start() #Start a thread to read from telemachus
-		time.sleep(active_vessel.update_speed)
+		time.sleep(update_speed)
 
-def _run(command):
-	"""Called in background when a command is run"""
+def run_command_threaded(command):
+	"""Open command in another thread"""
+	t=threading.Thread(target=_run_command_threaded_slave, args=(command,))
+	t.start()
+
+def _run_command_threaded_slave(command):
+	"""Called in background when a command is run thru run_command_threaded"""
 	urllib2.urlopen(command)
 
 class ActiveVessel:
@@ -218,7 +223,6 @@ class ActiveVessel:
 
 	def raw_run_command(self, stringx, value=None):
 		"""Run a command, using a raw querystring. If specified, value will be appended to string"""
-		print self.base+stringx+self._create_qs_params(value)
 		t=threading.Thread(target=_run, args=(self.base+stringx+self._create_qs_params(value),))
 		t.start()
 		return True

@@ -1,5 +1,15 @@
 import threading, urllib2, json, time
 
+def singleton(cls):
+    instances = {}
+    def getinstance():
+        if cls not in instances:
+            instances[cls] = cls()
+        return instances[cls]
+    return getinstance
+
+################################################################################################
+
 def _get_apistrings_read(base_url, data_dict, subscriptions):
 	"""This function is called by the background thread, and fetches all subscriptions"""
 	strings=subscriptions

@@ -1,3 +1,6 @@
+Please Check out kRPC, it's _way_ better for just about anything!
+=================================================================
+
 pyksp
 =====
 
